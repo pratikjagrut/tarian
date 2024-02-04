@@ -95,6 +95,9 @@ message Target {
 	repeated Process violatedProcesses = 2;
 	repeated ViolatedFile violatedFiles = 3;
 	optional FalcoAlert falcoAlert = 4;
+
+	string DetectionDataType = 5;
+	string DetectionData = 6;
 }
 
 message Event {

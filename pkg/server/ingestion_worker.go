@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+
 	"github.com/kube-tarian/tarian/pkg/protoqueue"
 	"github.com/kube-tarian/tarian/pkg/store"
 	"github.com/kube-tarian/tarian/pkg/tarianpb"
@@ -52,6 +54,9 @@ func (iw *IngestionWorker) Start() {
 			iw.logger.WithError(err).Error("error while processing event")
 			continue
 		}
+
+		buf, _ := json.Marshal(event)
+		iw.logger.WithField(">>>>>>>>> DEBUG Event >>>>>>>>>>", string(buf)).Debug("ingest event")
 
 		event.ServerTimestamp = timestamppb.Now()
 		err = iw.eventStore.Add(event)

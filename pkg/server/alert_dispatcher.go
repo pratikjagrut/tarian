@@ -25,7 +25,7 @@ const (
 
 // AlertDispatcher is responsible for dispatching alerts to Alertmanager.
 type AlertDispatcher struct {
-	amClient                *client.Alertmanager
+	amClient                *client.AlertmanagerAPI
 	alertEvaluationInterval time.Duration
 
 	logger *logrus.Logger
@@ -57,7 +57,7 @@ func NewAlertDispatcher(logger *logrus.Logger, amURL *url.URL, alertEvaluationIn
 //
 // Returns:
 // - *client.Alertmanager: A new Alertmanager client.
-func NewAlertmanagerClient(amURL *url.URL) *client.Alertmanager {
+func NewAlertmanagerClient(amURL *url.URL) *client.AlertmanagerAPI {
 	cr := clientruntime.New(amURL.Host, path.Join(amURL.Path, defaultAmApiv2path), []string{amURL.Scheme})
 
 	if amURL.User != nil {

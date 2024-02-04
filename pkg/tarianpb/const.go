@@ -17,3 +17,6 @@ const EventTypeFalcoAlert = "falco_alert"
 
 // EventTypePodDeleted represents an event type for deleted pods.
 const EventTypePodDeleted = "pod_deleted"
+
+// EventTypeDetection represents an event type for detection.
+const EventTypeDetection = "tarian-detector/detection"

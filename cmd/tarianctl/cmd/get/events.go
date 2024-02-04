@@ -161,6 +161,13 @@ func eventsTableOutput(events []*tarianpb.Event, logger *logrus.Logger) {
 				evt.WriteString("pod deleted")
 			}
 
+			if e.GetType() == tarianpb.EventTypeDetection {
+				evt.WriteString("detection")
+				evt.WriteString(t.GetDetectionDataType())
+				evt.WriteString(":")
+				evt.WriteString(t.GetDetectionData())
+			}
+
 			evt.WriteString("\n")
 
 			table.Append(

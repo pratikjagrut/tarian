@@ -2,13 +2,18 @@ package nodeagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/intelops/tarian-detector/pkg/detector"
+	"github.com/intelops/tarian-detector/tarian"
 	"github.com/kube-tarian/tarian/pkg/tarianpb"
 	"github.com/scylladb/go-set/strset"
 	"github.com/sirupsen/logrus"
@@ -101,7 +106,7 @@ func (n *NodeAgent) Run() {
 	defer n.grpcConn.Close()
 
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 
 	go func() {
 		_ = n.loopSyncConstraints(n.cancelCtx)
@@ -110,6 +115,11 @@ func (n *NodeAgent) Run() {
 
 	go func() {
 		_ = n.loopValidateProcesses(n.cancelCtx)
+		wg.Done()
+	}()
+
+	go func() {
+		_ = n.loopTarianDetectorEvents(n.cancelCtx)
 		wg.Done()
 	}()
 
@@ -421,4 +431,72 @@ func matchLabelsFromPodLabels(labels map[string]string) []*tarianpb.MatchLabel {
 	}
 
 	return matchLabels
+}
+
+func (n *NodeAgent) loopTarianDetectorEvents(ctx context.Context) error {
+	tarianEbpfModule, err := tarian.GetModule()
+	if err != nil {
+		return err
+	}
+
+	tarianDetector, err := tarianEbpfModule.Prepare()
+	if err != nil {
+		return err
+	}
+
+	// Instantiate event detectors
+	eventsDetector := detector.NewEventsDetector()
+
+	// Add ebpf programs to detectors
+	eventsDetector.Add(tarianDetector)
+
+	// Start and defer Close
+	err = eventsDetector.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer eventsDetector.Close()
+
+	n.logger.WithField("detectors", eventsDetector.Count()).Info("tarian-detector: running")
+
+	go func() {
+		for {
+			e, err := eventsDetector.ReadAsInterface()
+			if errors.Is(err, os.ErrClosed) {
+				break
+			}
+
+			if err != nil {
+				n.logger.WithError(err).Error("tarian-detector: error while reading as interface")
+				continue
+			}
+
+			n.logger.WithField("event", e).Debug("tarian-detector: event received")
+		}
+	}()
+
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (n *NodeAgent) SendDetectionEventToClusterAgent(detectionDataType, detectionData string) {
+	req := &tarianpb.IngestEventRequest{
+		Event: &tarianpb.Event{
+			Type:            tarianpb.EventTypeDetection,
+			ClientTimestamp: timestamppb.Now(),
+			Targets: []*tarianpb.Target{
+				{
+					DetectionDataType: detectionDataType,
+					DetectionData:     detectionData,
+				},
+			},
+		},
+	}
+
+	response, err := n.eventClient.IngestEvent(context.Background(), req)
+	if err != nil {
+		n.logger.WithError(err).Error("error while reporting detection events")
+	} else {
+		n.logger.WithField("response", response).Debug("ingest event response")
+	}
 }

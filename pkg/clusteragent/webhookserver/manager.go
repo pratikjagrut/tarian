@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -44,9 +45,12 @@ func init() {
 //   - error: An error, if any, encountered during manager creation.
 func NewManager(logger *logrus.Logger, port int, healthProbeBindAddress string, leaderElection bool) (manager.Manager, error) {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     "0",
-		Port:                   port,
+		Scheme: scheme,
+		Metrics: server.Options{
+			BindAddress: "0", // Set this to "0" to disable the metrics server.
+			// BindAddress: host:port
+		},
+
 		HealthProbeBindAddress: healthProbeBindAddress,
 		LeaderElection:         leaderElection,
 		LeaderElectionID:       leaderElectionID,
